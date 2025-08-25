@@ -1,0 +1,22 @@
+{
+    "credentials": {
+        "email": "tb9@mailinator.com",
+        "git_token": "glpat-6axKBrDz6zqeAfoMoJH5"
+    },
+    "access_codes": {
+        "primary_access_code": "WASU-QESHM-OSMIC-VARNA-ABASH-ROUSE"
+    },
+    "personal_urls": {
+        "jira_board": "https://pearson.atlassian.net/jira/software/c/projects/EXV2/boards/1591/backlog?customFilter=42582",
+        "notion_workspace": "https://www.notion.so/Temp-24ed194ddbc98024aa22eb9acb25d4b2"
+    },
+    "development": {
+        "cursor_command": "cursor projects/exchange-api; cursor projects/www-prototype/"
+    },
+    "additional_passwords": {
+        "example_service": "your_password_here",
+        "another_service": "another_password_here",
+        "vpn_password": "your_vpn_password",
+        "database_password": "your_db_password"
+    }
+}

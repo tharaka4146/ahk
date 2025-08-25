@@ -1,0 +1,21 @@
+# Sensitive data files - NEVER commit these
+sensitive_office.json
+config_office.json
+
+# Personal configuration backups
+*.backup
+*.bak
+
+# AutoHotkey compiled files
+*.exe
+
+# Windows system files
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
