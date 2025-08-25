@@ -1,0 +1,8 @@
+{
+    "version": "1.0.0",
+    "release_date": "2024-12-19",
+    "build": "stable",
+    "name": "AutoHotkey 60% Keyboard Script",
+    "description": "Advanced AutoHotkey script for 60% keyboards with configurable shortcuts and automation",
+    "author": "UBANDT1"
+}
