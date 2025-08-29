@@ -329,9 +329,9 @@ return
 return
 
 ; ctrl + win + alt
-#z::
-    Send, {F11}
-return
+; #z::
+;     Send, {F11}
+; return
 
 ; esc to esc
 Esc::Esc
@@ -648,8 +648,8 @@ return
 return
 ; ----------------------------------------- center windows ----------------------------------------
 
-~Shift::
-    if (A_PriorHotkey = "~Shift" and A_TimeSincePriorHotkey < 300) {
+~Alt::
+    if (A_PriorHotkey = "~Alt" and A_TimeSincePriorHotkey < 300) {
         WinGet, activeWindow, ID, A
         WinGetPos, , , winW, winH, ahk_id %activeWindow%
         SysGet, screenW, 78
