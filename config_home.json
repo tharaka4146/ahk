@@ -1,34 +1,33 @@
     {
-    "user": {
-        "username": "YOUR_USERNAME",
-        "downloads_folder": "C:\\Users\\YOUR_USERNAME\\Downloads",
-        "desktop_folder": "C:\\Users\\YOUR_USERNAME\\Desktop",
-        "screenshots_folder": "C:\\Users\\YOUR_USERNAME\\Pictures\\Screenshots"
-    },
-    "applications": {
-        "default_browser": "msedge.exe",
-        "alternative_browser": "chrome.exe",
-        "vpn_client_path": "C:\\Program Files (x86)\\Cisco\\Cisco Secure Client\\UI\\csc_ui.exe"
-    },
-    "browser_profiles": {
-        "chrome_default_profile": "default",
-        "chrome_music_profile": "profile 3"
-    },
-    "clipboard_shortcuts": {
-        "email": "[loaded from sensitive_office.json]",
-        "access_code": "[loaded from sensitive_office.json]",
-        "git_token": "[loaded from sensitive_office.json]",
-        "cursor_command": "[loaded from sensitive_office.json]"
-    },
-    "urls": {
-        "outlook": "https://outlook.office.com/mail/",
-        "jira": "[loaded from sensitive_office.json]",
-        "youtube": "https://www.youtube.com/",
-        "youtube_music": "https://www.youtube.com/results?search_query=music",
-        "teams_chat": "https://m365.cloud.microsoft/chat",
-        "chatgpt": "https://chatgpt.com/",
-        "notion": "[loaded from sensitive_office.json]",
-        "slt_usage": "https://myslt.slt.lk/boardBand/summary",
-        "testfully": "https://app.testfully.io/"
+        "user": {
+            "username": "HanSolo",
+            "downloads_folder": "C:\\Users\\HanSolo\\Downloads",
+            "desktop_folder": "C:\\Users\\HanSolo\\Desktop",
+            "screenshots_folder": "C:\\Users\\HanSolo\\Pictures\\Screenshots"
+        },
+        "applications": {
+            "default_browser": "msedge.exe",
+            "alternative_browser": "chrome.exe",
+            "vpn_client_path": "C:\\Program Files (x86)\\Cisco\\Cisco Secure Client\\UI\\csc_ui.exe"
+        },
+        "browser_profiles": {
+            "chrome_default_profile": "default",
+            "chrome_music_profile": "profile 3"
+        },
+        "clipboard_shortcuts": {
+            "email": "[loaded from sensitive_office.json]",
+            "access_code": "[loaded from sensitive_office.json]",
+            "git_token": "[loaded from sensitive_office.json]",
+            "cursor_command": "[loaded from sensitive_office.json]"
+        },
+        "urls": {
+            "outlook": "https://outlook.office.com/mail/",
+            "jira": "[loaded from sensitive_office.json]",
+            "youtube": "https://www.youtube.com/",
+            "youtube_music": "https://www.youtube.com/results?search_query=music",
+            "copilot": "https://m365.cloud.microsoft/chat",
+            "chatgpt": "https://chatgpt.com/",
+            "notion": "[loaded from sensitive_office.json]",
+            "slt_usage": "https://myslt.slt.lk/boardBand/summary"
+        }
     }
-}
