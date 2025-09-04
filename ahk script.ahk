@@ -200,19 +200,10 @@ GetLastEmail() {
 
 ; ============== Window Management Functions ==============
 
-; Function to run an application and maximize it (fullscreen without F11)
-RunAndCenter(command, workingDir := "", windowState := "", waitTime := 500) {
+; Function to run an application with maximized window using 'Max' option
+RunAndCenter(command, workingDir := "", windowState := "Max", waitTime := 500) {
     Run, %command%, %workingDir%, %windowState%, newPID
-    
-    ; Wait for the window to appear and become active
     Sleep, %waitTime%
-    
-    ; Get the active window (should be the newly opened one)
-    WinGet, activeWindow, ID, A
-    
-    ; Maximize the window
-    WinMaximize, ahk_id %activeWindow%
-    
     return newPID
 }
 
