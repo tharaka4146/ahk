@@ -2,6 +2,7 @@
 #Persistent ; Keeps the script running
 #SingleInstance force
 DetectHiddenWindows, on
+SetWinDelay, -1
 
 ; ============== Configuration Loading ==============
 ; Email counter functionality
@@ -56,6 +57,9 @@ copilotUrl := config.urls.copilot
 chatgptUrl := config.urls.chatgpt
 notionUrl := sensitive.personal_urls.notion_workspace
 sltUsageUrl := config.urls.slt_usage
+
+; URL sets (for batch opening)
+urlSets := config.url_sets
 
 ; ============== Configuration Functions ==============
 LoadConfig(filePath) {
@@ -116,6 +120,9 @@ ParseJSON(jsonStr) {
     config.urls.notion := ExtractJSONValue(jsonStr, "notion")
     config.urls.slt_usage := ExtractJSONValue(jsonStr, "slt_usage")
 
+    ; Parse URL sets section
+    config.url_sets := ParseUrlSets(jsonStr)
+
     return config
 }
 
@@ -127,6 +134,49 @@ ExtractJSONValue(jsonStr, key) {
     ; Convert escaped backslashes back to single backslashes
     StringReplace, value, value, \\, \, All
     return value
+}
+
+ParseUrlSets(jsonStr) {
+    ; Parse URL sets from JSON
+    ; Format: "url_sets": { "set_name": ["url1", "url2", ...] }
+    urlSets := {}
+    urlSetOrder := []
+
+    ; Locate the block containing url_sets
+    if !RegExMatch(jsonStr, "s)""url_sets""\s*:\s*\{(.*)\}", block) {
+        urlSets.__Order := urlSetOrder
+        return urlSets
+    }
+
+    urlSetsContent := block1
+    setPos := 1
+
+    ; Find each set definition: "name": [ ... ]
+    while (setPos := RegExMatch(urlSetsContent, "s)""([^""]+)""\s*:\s*\[(.*?)\]", setMatch, setPos)) {
+        setName := setMatch1
+        arrayContent := setMatch2
+
+        urls := {}
+        urlIndex := 1
+        urlPos := 1
+
+        ; Find each quoted URL within the array
+        while (urlPos := RegExMatch(arrayContent, "s)""([^""]+)""", urlMatch, urlPos)) {
+            url := urlMatch1
+            if (url != "") {
+                urls[urlIndex] := url
+                urlIndex++
+            }
+            urlPos += StrLen(urlMatch)
+        }
+
+        urlSets[setName] := urls
+        urlSetOrder.Push(setName)
+        setPos += StrLen(setMatch)
+    }
+
+    urlSets.__Order := urlSetOrder
+    return urlSets
 }
 
 ParseSensitiveJSON(jsonStr) {
@@ -198,6 +248,241 @@ GetLastEmail() {
     return "tb" . lastEmailNumber . "@mailinator.com"
 }
 
+; ============== WSL Repo Selector Functions ==============
+
+ShowWslRepoSelector() {
+    global wslRepoSelectedName
+    wslRepoSelectedName := ""
+    
+    ; Define the folder containing bat files
+    bashShortcutsFolder := "C:\Users\UBANDT1\Downloads\bash shortcuts"
+    
+    ; Build list of bat files
+    repoList := {}
+    repoNames := ""
+    
+    Loop, Files, %bashShortcutsFolder%\*.bat
+    {
+        ; Get file name without extension
+        SplitPath, A_LoopFileName, , , , fileNameNoExt
+        
+        ; Store the full path
+        repoList[fileNameNoExt] := A_LoopFileFullPath
+        
+        ; Build display list
+        if (repoNames != "")
+            repoNames .= "|"
+        repoNames .= fileNameNoExt
+    }
+    
+    ; Check if we have any bat files
+    if (repoNames = "") {
+        MsgBox, 48, No Repos Found, No .bat files found in:`n%bashShortcutsFolder%
+        return ""
+    }
+    
+    ; Create GUI
+    Gui, WslRepoSelector:New, +AlwaysOnTop +ToolWindow, Select WSL Repo
+    Gui, WslRepoSelector:Add, Text, x10 y10 w300, Select a repository to open in WSL:
+    Gui, WslRepoSelector:Add, ListBox, x10 y35 w300 h200 vSelectedRepo gOnRepoDoubleClick, %repoNames%
+    Gui, WslRepoSelector:Add, Button, x10 y245 w140 h30 gOnOpenRepo, &Open
+    Gui, WslRepoSelector:Add, Button, x170 y245 w140 h30 gOnCancelRepo, &Cancel
+    Gui, WslRepoSelector:Show, w320 h285
+    
+    ; Wait for button click or double-click
+    WinWaitClose, Select WSL Repo
+    
+    return wslRepoSelectedName
+}
+
+OnRepoDoubleClick:
+    if (A_GuiEvent = "DoubleClick") {
+        Gui, WslRepoSelector:Submit, NoHide
+        global wslRepoSelectedName
+        wslRepoSelectedName := SelectedRepo
+        Gui, WslRepoSelector:Destroy
+        OpenWslRepo(wslRepoSelectedName)
+    }
+return
+
+OnOpenRepo:
+    Gui, WslRepoSelector:Submit, NoHide
+    global wslRepoSelectedName
+    wslRepoSelectedName := SelectedRepo
+    Gui, WslRepoSelector:Destroy
+    OpenWslRepo(wslRepoSelectedName)
+return
+
+OnCancelRepo:
+    Gui, WslRepoSelector:Destroy
+return
+
+OpenWslRepo(repoName) {
+    if (!repoName || repoName = "") {
+        return
+    }
+    
+    ; Define the folder containing bat files
+    bashShortcutsFolder := "C:\Users\UBANDT1\Downloads\bash shortcuts"
+    batFilePath := bashShortcutsFolder . "\" . repoName . ".bat"
+    
+    ; Check if file exists
+    IfNotExist, %batFilePath%
+    {
+        MsgBox, 16, Error, Bat file not found:`n%batFilePath%
+        return
+    }
+    
+    ; Run the bat file
+    Run, "%batFilePath%", %bashShortcutsFolder%
+    
+    ; Show confirmation
+    TrayTip, WSL Repo Opened, Opening '%repoName%' in WSL..., 2
+    
+    OutputDebug, [WSL Repo] Opened: %repoName%
+}
+
+; ============== URL Set Selector Functions ==============
+
+ShowUrlSetSelector() {
+    global urlSets, defaultBrowser, urlSetSelectedName
+    urlSetSelectedName := ""
+    urlSetOrder := urlSets.__Order
+    
+    ; Check if we have any URL sets
+    hasSets := false
+    if (IsObject(urlSetOrder) && urlSetOrder.MaxIndex() >= 1) {
+        hasSets := true
+    } else {
+        for setName, urls in urlSets {
+            if (setName = "__Order")
+                continue
+            hasSets := true
+            break
+        }
+    }
+    if (!hasSets) {
+        MsgBox, 48, No URL Sets, No URL sets found in configuration.`n`nPlease add URL sets to your config file.
+        return ""
+    }
+    
+    ; Build list of set names
+    setNames := ""
+    if (IsObject(urlSetOrder) && urlSetOrder.MaxIndex() >= 1) {
+        Loop, % urlSetOrder.MaxIndex() {
+            currentSetName := urlSetOrder[A_Index]
+            if (setNames != "")
+                setNames .= "|"
+            setNames .= currentSetName
+        }
+    } else {
+        for setName, urls in urlSets {
+            if (setName = "__Order")
+                continue
+            if (setNames != "")
+                setNames .= "|"
+            setNames .= setName
+        }
+    }
+    
+    ; Create GUI
+    Gui, UrlSetSelector:New, +AlwaysOnTop +ToolWindow, Select URL Set
+    Gui, UrlSetSelector:Add, Text, x10 y10 w300, Select a URL set to open:
+    Gui, UrlSetSelector:Add, ListBox, x10 y35 w300 h200 vSelectedSet gOnSetDoubleClick, %setNames%
+    Gui, UrlSetSelector:Add, Button, x10 y245 w140 h30 gOnOpenSet, &Open
+    Gui, UrlSetSelector:Add, Button, x170 y245 w140 h30 gOnCancelSet, &Cancel
+    Gui, UrlSetSelector:Show, w320 h285
+    
+    ; Wait for button click or double-click
+    WinWaitClose, Select URL Set
+    
+    return urlSetSelectedName
+}
+
+OnSetDoubleClick:
+    if (A_GuiEvent = "DoubleClick") {
+        Gui, UrlSetSelector:Submit, NoHide
+        global urlSetSelectedName
+        urlSetSelectedName := SelectedSet
+        Gui, UrlSetSelector:Destroy
+        OpenUrlSet(urlSetSelectedName)
+    }
+return
+
+OnOpenSet:
+    Gui, UrlSetSelector:Submit, NoHide
+    global urlSetSelectedName
+    urlSetSelectedName := SelectedSet
+    Gui, UrlSetSelector:Destroy
+    OpenUrlSet(urlSetSelectedName)
+return
+
+OnCancelSet:
+    Gui, UrlSetSelector:Destroy
+return
+
+OpenUrlSet(setName) {
+    global urlSets, defaultBrowser
+    
+    if (!setName || setName = "") {
+        return
+    }
+    
+    ; Get the URLs for this set
+    if (!urlSets.HasKey(setName)) {
+        MsgBox, 16, Error, URL set '%setName%' not found.
+        return
+    }
+    
+    urls := urlSets[setName]
+    if (!urls) {
+        MsgBox, 48, Empty Set, URL set '%setName%' is empty or not found.
+        return
+    }
+    
+    ; Open each URL - iterate through numeric indices
+    urlCount := 0
+    index := 1
+    Loop, 100 {
+        ; Try to get URL at this index
+        url := urls[index]
+        ; Check if URL exists and is not empty
+        if (!url || url = "" || StrLen(url) = 0) {
+            ; No more URLs
+            break
+        }
+        
+        urlCount++
+        OutputDebug, [URL Sets] Opening URL %urlCount%: %url%
+        if (urlCount = 1) {
+            ; First URL opens in a new window
+            Run, %defaultBrowser% "%url%" --new-window
+        } else {
+            ; Subsequent URLs open in new tabs
+            Run, %defaultBrowser% "%url%"
+        }
+        ; Small delay to prevent overwhelming the browser
+        Sleep, 4000
+        index++
+    }
+    
+    OutputDebug, [URL Sets] Opened %urlCount% URLs for set '%setName%'
+    
+    if (urlCount = 0) {
+        ; Debug output
+        OutputDebug, [URL Sets] OpenUrlSet: Set '%setName%' appears empty. Checking urls object...
+        ; Try to see what's in the object
+        for key, value in urls {
+            OutputDebug, [URL Sets] Found key: %key%, value: %value%
+        }
+        MsgBox, 48, Empty Set, URL set '%setName%' is empty or could not be parsed.`n`nPlease check the config file format.
+        return
+    }
+    
+    ; Show confirmation
+    TrayTip, URL Set Opened, Opened %urlCount% URL(s) from '%setName%', 2
+}
+
 ; ============== Window Management Functions ==============
 
 ; Function to run an application with maximized window using 'Max' option
@@ -215,6 +500,72 @@ CenterWindow(windowID) {
     newX := (screenW - winW) // 2
     newY := (screenH - winH) // 2
     WinMove, ahk_id %windowID%, , newX, newY
+}
+
+; Switch focus to the next eligible top-level window without showing Alt-Tab UI
+SwitchToNextApp() {
+    WinGet, activeHwnd, ID, A
+    WinGet, windowList, List,,, Program Manager
+
+    total := windowList
+    if (total <= 1)
+        return
+
+    activeIndex := 0
+    Loop, %total%
+    {
+        thisHwnd := windowList%A_Index%
+        if (thisHwnd = activeHwnd) {
+            activeIndex := A_Index
+            break
+        }
+    }
+
+    idx := activeIndex
+    Loop, %total%
+    {
+        idx++
+        if (idx > total)
+            idx := 1
+
+        candidate := windowList%idx%
+        if (candidate = activeHwnd)
+            continue
+
+        if (IsWindowEligible(candidate)) {
+            WinActivate, ahk_id %candidate%
+            return
+        }
+    }
+}
+
+; Determine if a window should be considered for CapsLock switching
+IsWindowEligible(hwnd) {
+    if (!hwnd)
+        return false
+
+    WinGet, style, Style, ahk_id %hwnd%
+    if !(style & 0x10000000) ; WS_VISIBLE
+        return false
+
+    WinGet, exStyle, ExStyle, ahk_id %hwnd%
+    if (exStyle & 0x00000080) ; WS_EX_TOOLWINDOW
+        return false
+
+    WinGetTitle, title, ahk_id %hwnd%
+    if (title = "")
+        return false
+
+    WinGetClass, class, ahk_id %hwnd%
+    if (class = "Shell_TrayWnd"
+        || class = "Shell_SecondaryTrayWnd"
+        || class = "TaskSwitcherWnd"
+        || class = "MultitaskingViewFrame"
+        || class = "Progman"
+        || class = "WorkerW")
+        return false
+
+    return true
 }
 
 ; ============== Resolution Change Functions ==============
@@ -265,12 +616,12 @@ return
 
 ; ctrl + alt + x: Volume up
 <^<!x::
-    Send {Volume_Up}
+        Send {Volume_Up}
 return
 
 ; ctrl + alt + z: Volume down
 <^<!z::
-    Send {Volume_Down}
+        Send {Volume_Down}
 return
 
 ; ============== SYSTEM UTILITIES ==============
@@ -345,8 +696,9 @@ return
 Esc::Esc
 return
 
-; CapsLock: Remap to Escape
-CapsLock::Esc
+; CapsLock: Switch to the next recent application
+CapsLock::
+    SwitchToNextApp()
 return
 
 ; ============== APPLICATION LAUNCHERS ==============
@@ -440,6 +792,84 @@ return
     RunAndCenter(defaultBrowser . " """ . sltUsageUrl . """")
 return
 
+; win + shift + u: URL Set Selector
+<+#u::
+    ShowUrlSetSelector()
+    ; Note: OpenUrlSet is called by the GUI handlers (OnOpenSet/OnSetDoubleClick)
+    ; so we don't need to call it here
+return
+
+; win + shift + r: WSL Repo Selector
+<+#r::
+    ShowWslRepoSelector()
+    ; Note: OpenWslRepo is called by the GUI handlers (OnOpenRepo/OnRepoDoubleClick)
+    ; so we don't need to call it here
+return
+
+; ============== TEXT EXPANSION ==============
+
+; win + q: Quick text expansion
+; Type a keyword and press Enter to replace it with a predefined string
+#q::
+    ; Visual feedback with instructions
+    ToolTip, Quick Expand: Type keyword and press Enter (Esc to cancel)
+    
+    ; Capture input invisibly until Enter is pressed (I flag = invisible input)
+    Input, userInput, I L50, {Enter}{Escape}
+    
+    ; Clear tooltip
+    ToolTip
+    
+    ; Check if input was cancelled with Escape
+    if (ErrorLevel = "EndKey:Escape") {
+        return
+    }
+    
+    ; Define your text expansion mappings here
+    ; Add more mappings as needed
+    expansionMap := {}
+    
+    ; GitLab Repositories (🦊 links from favorites)
+    expansionMap["keystone"] := "https://gitlab.com/pearsontechnology/gpt/exchange/keystone/KeystoneAPI"
+    expansionMap["sfcmfe"] := "https://gitlab.com/pearsontechnology/gpt/exchange/student-fulfillment/student-fulfillment-component-mfe"
+    expansionMap["sfc"] := "https://gitlab.com/pearsontechnology/gpt/exchange/student-fulfillment/student-fulfillment-component"
+    expansionMap["exchangeapi"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/exchange-api"
+    expansionMap["occ"] := "https://gitlab.com/pearsontechnology/gpt/exchange/student-fulfillment/mlm-order-confirmation-component"
+    expansionMap["rpc"] := "https://gitlab.com/pearsontechnology/gpt/exchange/student-fulfillment/related-product-component"
+    expansionMap["testharness"] := "https://gitlab.com/pearsontechnology/gpt/exchange/student-fulfillment/sfc-test-harness"
+    expansionMap["exchangeuicomponent"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/exchange-ui-component"
+    expansionMap["exchangeui"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/exchange-ui"
+    expansionMap["wwwprototype"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/www-prototype"
+    expansionMap["prototypeconfig"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/prototype-configuration"
+    expansionMap["urls"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/prototype-configuration/-/blob/master/prd/exchange.service?ref_type=heads"
+    expansionMap["exchangeadmin"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchange/exchange-admin"
+    expansionMap["synthetic"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchang/exchange-synthetic-scripts"
+    expansionMap["exchangeadminapi"] := "https://gitlab.com/pearsontechnology/gpt/exchange/exchange/exchange-admin-api"
+    
+    ; Check if the input matches a keyword
+    if (expansionMap.HasKey(userInput)) {
+        ; Store original clipboard
+        originalClipboard := Clipboard
+        
+        ; Put replacement text in clipboard and paste it
+        replacementText := expansionMap[userInput]
+        Clipboard := replacementText
+        SendInput, ^v
+        
+        ; Restore original clipboard after a short delay
+        Sleep, 100
+        Clipboard := originalClipboard
+    } else {
+        ; If no match found, show what they typed instead
+        SendInput, %userInput%
+    }
+return
+
+RemoveToolTip:
+    ToolTip
+    SetTimer, RemoveToolTip, Off
+return
+
 ; ============== CLIPBOARD AUTOMATION ==============
 
 ; shift + alt + ctrl + v: Next incremented email address
@@ -531,6 +961,17 @@ Esc & 7::switchDesktopByNumber(7)
 Esc & 8::switchDesktopByNumber(8)
 Esc & 9::switchDesktopByNumber(9)
 
+; ctrl + shift + number keys: Move active window to target desktop
+^+1::moveWindowToDesktop(1)
+^+2::moveWindowToDesktop(2)
+^+3::moveWindowToDesktop(3)
+^+4::moveWindowToDesktop(4)
+^+5::moveWindowToDesktop(5)
+^+6::moveWindowToDesktop(6)
+^+7::moveWindowToDesktop(7)
+^+8::moveWindowToDesktop(8)
+^+9::moveWindowToDesktop(9)
+
 ; ============== VIRTUAL DESKTOP FUNCTIONS ==============
 
 ; This function examines the registry to build an accurate list of the current virtual desktops and which one we're currently on.
@@ -613,6 +1054,59 @@ switchDesktopByNumber(targetDesktop) {
         Send ^#{Left}
         CurrentDesktop--
         OutputDebug, [left] target: %targetDesktop% current: %CurrentDesktop%
+    }
+}
+
+moveWindowToDesktop(targetDesktop) {
+    global CurrentDesktop, DesktopCount
+    mapDesktopsFromRegistry()
+
+    if (targetDesktop > DesktopCount || targetDesktop < 1) {
+        OutputDebug, [move-invalid] target: %targetDesktop% desktops: %DesktopCount%
+        return
+    }
+
+    WinGet, activeWindow, ID, A
+    if (!activeWindow) {
+        OutputDebug, [move-no-window]
+        return
+    }
+
+    originalDesktop := CurrentDesktop
+
+    if (targetDesktop = originalDesktop) {
+        OutputDebug, [move-same] desktop: %targetDesktop%
+        return
+    }
+
+    direction := targetDesktop > originalDesktop ? "Right" : "Left"
+    steps := Abs(targetDesktop - originalDesktop)
+
+    Loop, %steps%
+    {
+        SendInput, {LWin down}{LCtrl down}{LShift down}
+        SendInput, {%direction%}
+        SendInput, {LShift up}{LCtrl up}{LWin up}
+        Sleep, 120
+    }
+
+    Sleep, 200
+    mapDesktopsFromRegistry()
+
+    if (CurrentDesktop != targetDesktop) {
+        OutputDebug, [move-corrective-switch] current: %CurrentDesktop% target: %targetDesktop%
+        switchDesktopByNumber(targetDesktop)
+    }
+
+    CurrentDesktop := targetDesktop
+
+    if WinExist("ahk_id " activeWindow)
+    {
+        WinActivate, ahk_id %activeWindow%
+    }
+    else
+    {
+        OutputDebug, [move-missing-window] hwnd: %activeWindow%
     }
 }
 
